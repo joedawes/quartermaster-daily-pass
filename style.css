@@ -20,3 +20,9 @@
 
 /* v1.5: standalone landing page, no manuscript previews */
 .home-screen{max-width:700px;margin:clamp(55px,14vh,160px) auto;text-align:center}.home-intro p{margin-left:auto;margin-right:auto}.home-actions{justify-content:center}.home-section-title,.home-chapters{display:none}
+
+/* v1.6: restrained per-chapter notes and prompt settings */
+.chapter-notes-panel{margin-bottom:12px;text-align:left;border:1px solid var(--border);border-radius:9px;padding:11px}
+.chapter-notes-panel summary{cursor:pointer;font-size:13px;font-weight:600}
+.chapter-notes-panel textarea{width:100%;box-sizing:border-box;margin-top:10px;min-height:100px}
+#review-instructions{width:100%;box-sizing:border-box;min-height:280px;font-family:inherit;line-height:1.5}

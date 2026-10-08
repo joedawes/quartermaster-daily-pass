@@ -1,5 +1,5 @@
 'use strict';
-// Quartermaster Daily Pass v1.5. All manuscript edits are user-confirmed.
+// Quartermaster Daily Pass v1.6. All manuscript edits are user-confirmed.
 const STORE = 'quartermaster_daily_pass_v1';
 const CLOUD_STORE = 'quartermaster_daily_cloud_v1';
 const SYNC_STORE = 'quartermaster_daily_sync_v1';
@@ -79,6 +79,7 @@ function render(){
   const c=current();$('home-screen').hidden=!homeVisible;$('empty-state').hidden=homeVisible||!!c;$('chapter-workspace').hidden=homeVisible||!c;
   if(!c)return;
   ensureChapter(c);
+  if(document.activeElement!==$('chapter-review-notes')) $('chapter-review-notes').value=c.reviewNotes||'';
   $('chapter-title').textContent=c.title;
   $('chapter-subtitle').textContent='Original kept safely · last worked '+timeString(c.updatedAt);
   $('word-count').textContent=countWords(c.text).toLocaleString()+' words';
@@ -219,9 +220,7 @@ function importReview(text){
   return parsed;
 }
 function downloadBackup(){download('Quartermaster_Daily_Pass_Backup_'+new Date().toISOString().slice(0,10)+'.json',JSON.stringify({app:'quartermaster-daily-pass',exportedAt:new Date().toISOString(),state},null,2),'application/json');}
-const reviewPrompt = c => `THE QUARTERMASTER — DAILY PASS: CONSERVATIVE FIRST-DRAFT REVIEW
-
-You are reviewing a first-draft novel chapter for a personal review app. This request is self-contained; do not rely on earlier chats. Act as a restrained copyeditor and diagnostic reader, not a co-writer. Return review suggestions ONLY, not a rewritten chapter.
+const DEFAULT_EDITORIAL_PROMPT = `You are reviewing a first-draft novel chapter for a personal review app. This request is self-contained; do not rely on earlier chats. Act as a restrained copyeditor and diagnostic reader, not a co-writer. Return review suggestions ONLY, not a rewritten chapter.
 
 PRINCIPLE: Correct what is clearly wrong. Flag what might be wrong. Preserve everything else. A different sentence is not an improvement simply because it sounds smoother.
 
@@ -238,22 +237,30 @@ THREE PRIORITIES (use these exact JSON values):
 - "later" = LATER: continuity, character, pacing, structure or larger stylistic observations. Flag genuine issues without imposing an arbitrary maximum; avoid repetition, speculation, or a barrage of minor opinions. DO NOT solve or rewrite.
 - No quotas. If there is nothing material to flag, return an empty suggestions array.
 
-KNOWN CONSISTENCY POINT: The senior female officer introduced in Chapter 1 is now a COLONEL, not a General. Watch for inconsistent rank references and accidents of global replacement (e.g. "in colonel"). If uncertain, use "possible" or "later"; do not silently rewrite canon.
-
-STRICT OUTPUT: Return exactly ONE valid JSON object, with no Markdown, code fences, prefatory text or concluding explanation:
-{"chapter_title":"${c.title}","suggestions":[{"original":"EXACT verbatim passage from manuscript (or empty string for a chapter-wide note)","replacement":"minimally changed version of same passage, or null for note-only","type":"punctuation|grammar|spelling|spacing|clarity|continuity|structure|other","priority":"clear|possible|later","note":"brief specific reason"}]}
+KNOWN CONSISTENCY POINT: The senior female officer introduced in Chapter 1 is now a COLONEL, not a General. Watch for inconsistent rank references and accidents of global replacement (e.g. "in colonel"). If uncertain, use "possible" or "later"; do not silently rewrite canon.`;
+const LOCKED_REVIEW_FORMAT = `STRICT OUTPUT: Return exactly ONE valid JSON object, with no Markdown, code fences, prefatory text or concluding explanation:
+{"chapter_title":"{{CHAPTER_TITLE}}","suggestions":[{"original":"EXACT verbatim passage from manuscript (or empty string for a chapter-wide note)","replacement":"minimally changed version, EXACT original for observations, or null for chapter-wide notes","type":"punctuation|grammar|spelling|spacing|clarity|continuity|structure|other","priority":"clear|possible|later","note":"brief specific reason"}]}
 
 MATCHING AND SAFETY:
 - Each suggested replacement MUST quote its "original" passage *exactly* as it appears in the manuscript. Preserve whitespace, curly quotes, spelling and case in that original anchor. Prefer the shortest UNIQUE identifying span; enlarge it if repeated. Never invent or paraphrase an anchor.
 - For a passage-specific observation without a definite correction, set "replacement" equal to the EXACT "original" passage. For chapter-wide observations without a passage, set "replacement":null. Use "original":"" only for chapter-wide observations with no single meaningful anchor.
 - Change only the quoted passage, never adjacent text. Do not combine multiple unrelated edits in one replacement.
 - Do not assume that this review is being applied to the newest Scrivener version: suggestions must match the exact provided manuscript. The author will decide what to accept.
-- Escape quotation marks, backslashes and line breaks correctly for JSON. Match "chapter_title" exactly.
+- Escape quotation marks, backslashes and line breaks correctly for JSON. Match "chapter_title" exactly.`;
+function reviewPrompt(c){
+  const editorial=(state.reviewInstructions ?? DEFAULT_EDITORIAL_PROMPT).trim() || DEFAULT_EDITORIAL_PROMPT;
+  const notes=(c.reviewNotes||'').trim();
+  return `THE QUARTERMASTER — DAILY PASS: CONSERVATIVE FIRST-DRAFT REVIEW
+
+${editorial}
+
+${notes ? 'ADDITIONAL REVIEW NOTES FOR THIS CHAPTER (supplement the rules above; do not override the locked output format):\n'+notes+'\n\n' : ''}${LOCKED_REVIEW_FORMAT.replace('{{CHAPTER_TITLE}}',c.title)}
 
 CHAPTER TITLE: ${c.title}
 === BEGIN MANUSCRIPT ===
 ${c.text}
 === END MANUSCRIPT ===`;
+}
 
 // ---- Cloud sync: private per-user Supabase row with optimistic revision checks. ----
 function paintSync(){
@@ -388,7 +395,14 @@ $('review-file-btn').onclick=()=>$('review-file').click();
 $('review-file').onchange=async e=>{const file=e.target.files[0];if(file)$('review-json').value=await file.text();e.target.value='';};
 $('review-confirm').onclick=()=>{try{const r=importReview($('review-json').value);$('review-dialog').close();if(r.unmatched)alert(`${r.items.length} suggestions imported. ${r.unmatched} passage(s) are missing or ambiguous; these require manual attention.`);}catch(e){$('review-import-result').textContent=e.message;}};
 $('copy-chapter').onclick=async()=>{try{await navigator.clipboard.writeText(current().text);notify('Full working chapter copied');}catch(e){alert('Could not copy text: '+e.message);}};
-$('copy-prompt').onclick=async()=>{try{await navigator.clipboard.writeText(reviewPrompt(current()));notify('Review instructions and chapter copied to clipboard');}catch(e){alert('Clipboard unavailable. Open this app on HTTPS (GitHub Pages) to use this feature.');}};
+$('settings-btn').onclick=()=>{$('review-instructions').value=state.reviewInstructions??DEFAULT_EDITORIAL_PROMPT;$('settings-dialog').showModal();};
+$('settings-close').onclick=()=>$('settings-dialog').close();
+$('settings-save').onclick=()=>{const value=$('review-instructions').value.trim();if(!value){alert('Instructions cannot be empty. Use Reset to Default instead.');return;}remember();state.reviewInstructions=value;touch();$('settings-dialog').close();notify('Review instructions saved · cloud pending');};
+$('settings-reset').onclick=()=>{if(!confirm('Restore the original Daily Pass review instructions?'))return;$('review-instructions').value=DEFAULT_EDITORIAL_PROMPT;remember();state.reviewInstructions=DEFAULT_EDITORIAL_PROMPT;touch();notify('Default review instructions restored');};
+$('chapter-review-notes').addEventListener('change',()=>{const value=$('chapter-review-notes').value;const ch=current();if(ch&&value!==(ch.reviewNotes||''))mutate(c=>{c.reviewNotes=value;});});
+$('copy-prompt').onclick=async()=>{try{const notes=$('chapter-review-notes').value;
+if(notes!==(current().reviewNotes||''))mutate(c=>{c.reviewNotes=notes;});
+await navigator.clipboard.writeText(reviewPrompt(current()));notify('Review instructions and chapter copied to clipboard');}catch(e){alert('Clipboard unavailable. Open this app on HTTPS (GitHub Pages) to use this feature.');}};
 $('cloud-btn').onclick=()=>{ $('cloud-url').value=cloudCfg.url||'';$('cloud-key').value=cloudCfg.key||'';$('cloud-dialog').showModal();};
 $('cloud-close').onclick=()=>$('cloud-dialog').close();
 $('cloud-connect').onclick=async()=>{const url=$('cloud-url').value.trim(),key=$('cloud-key').value.trim();if(!/^https:\/\/[a-z0-9.-]+\.supabase\.co\/?$/i.test(url)||!key){setCloudMessage('Enter a valid Supabase project URL and a publishable/anon key.');return;}cloudCfg={url:url.replace(/\/$/,''),key};localStorage.setItem(CLOUD_STORE,JSON.stringify(cloudCfg));sb=null;user=null;cloudUserId=null;cloudRev=null;dirty=state.chapters.length>0;persistSyncMeta();setCloudMessage('Configuration saved. Connect and sign in.');await initSupabase();};
