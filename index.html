@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#172a23">
+<title>The Quartermaster — Daily Pass</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark">Q<span>·</span></div><div><strong>THE QUARTERMASTER</strong><small>Daily Pass / Draft Review</small></div></div>
+    <div class="top-actions">
+      <span id="sync-pill" class="pill" title="Cloud sync state">Local only</span>
+      <button id="cloud-btn" class="btn ghost" type="button">Cloud <span class="desktop-only">setup</span></button>
+      <button id="theme-btn" class="btn icon-btn" type="button" aria-label="Switch colour theme">◐</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="sidebar-title"><span>CHAPTERS</span><button id="new-chapter" class="btn tiny" type="button">+ Add</button></div>
+      <div id="chapter-list" class="chapter-list"></div>
+      <div class="sidebar-foot">
+        <button id="import-chapter" class="btn outline full" type="button">Import .txt / .md</button>
+        <button id="backup-btn" class="btn ghost full" type="button">Download full backup</button>
+        <button id="restore-btn" class="btn ghost full" type="button">Restore backup</button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <div id="empty-state" class="empty-state">
+        <div class="large-mark">Q</div>
+        <h1>Your daily clean pass</h1>
+        <p>Import a chapter from Scrivener. Read the manuscript beside a queue of suggested changes and notes. Accept, edit, skip or save for later. Nothing is applied automatically.</p>
+        <div class="button-row centered"><button id="empty-import" class="btn primary">Import chapter</button><button id="empty-new" class="btn outline">Add blank chapter</button></div>
+        <p class="muted fine">Your original is preserved. Cloud sync becomes available once configured and signed in.</p>
+      </div>
+
+      <div id="chapter-workspace" hidden>
+        <div class="work-header">
+          <div class="work-title"><span class="eyebrow">CURRENT CHAPTER</span><h1 id="chapter-title">Chapter 1</h1><div id="chapter-subtitle" class="muted fine"></div></div>
+          <div class="work-actions"><button id="rename-btn" class="btn ghost">Rename</button><button id="delete-chapter" class="btn ghost" title="Delete this chapter (asks for confirmation)">Delete</button><button id="export-txt" class="btn primary">Export clean .txt</button></div>
+        </div>
+        <div class="progress-line"><div class="track"><div id="progress-fill" class="fill"></div></div><span id="progress-label" class="fine muted">0 / 0 reviewed</span></div>
+        <div class="review-layout">
+          <section class="pane manuscript-pane">
+            <div class="pane-header"><div><b>MANUSCRIPT</b><span id="word-count" class="muted fine">0 words</span></div>
+              <div class="pane-tools"><button id="view-original" class="btn tiny ghost" title="Toggle between working copy and untouched original">View original</button><button id="add-selection-note" class="btn tiny ghost" title="Select text and attach a note">+ Note on selection</button><button id="edit-text" class="btn tiny outline">Edit text</button></div>
+            </div>
+            <div id="manuscript-view" class="manuscript-view" tabindex="0"></div>
+            <div id="text-editor" class="text-editor" hidden>
+              <div class="fine muted">Edit freely here, then save. Existing suggestions are checked against the updated wording.</div>
+              <textarea id="working-text" spellcheck="true" aria-label="Editable chapter text"></textarea>
+              <div class="button-row"><button id="save-text" class="btn primary">Save changes</button><button id="cancel-text" class="btn ghost">Cancel</button></div>
+            </div>
+          </section>
+          <section class="pane review-pane">
+            <div class="pane-header"><div><b>REVIEW QUEUE</b><span id="review-count" class="muted fine">0 notes</span></div><div><button id="import-review" class="btn tiny outline">Import review JSON</button></div></div>
+            <div class="review-control"><select id="review-filter" aria-label="Filter review suggestions"><option value="pending">Pending</option><option value="all">All suggestions</option><option value="later">Later</option><option value="done">Accepted / skipped</option></select><button id="add-note" class="btn tiny ghost">+ Add note</button><button id="undo-btn" class="btn tiny ghost" title="Undo last change">↶ Undo</button></div>
+            <div id="review-items" class="review-items"></div>
+            <div class="queue-footer"><button id="copy-prompt" class="btn ghost full">Copy chapter + Daily Pass prompt</button><p class="muted fine">Paste into your dedicated Daily Pass ChatGPT chat; copy the JSON reply into Import review JSON. Nothing is sent automatically.</p></div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <footer class="footer"><span>READ → FIX OBVIOUS → FLAG DOUBT → MOVE ON</span><span id="save-status">Ready · locally saved</span></footer>
+</div>
+
+<input type="file" id="chapter-file" accept=".txt,.md,text/plain,text/markdown" hidden>
+<input type="file" id="review-file" accept=".json,application/json" hidden>
+<input type="file" id="backup-file" accept=".json,application/json" hidden>
+
+<dialog id="chapter-dialog" class="modal"><form method="dialog" id="chapter-form"><h2>Add a chapter</h2><label>Chapter name<input id="chapter-name" type="text" maxlength="120" placeholder="Chapter 3" required></label><label>Paste text (optional)<textarea id="chapter-initial-text" rows="7" placeholder="Or import a .txt file after creating it"></textarea></label><div class="button-row end"><button class="btn ghost" value="cancel">Cancel</button><button id="chapter-create" class="btn primary" value="create">Add chapter</button></div></form></dialog>
+
+<dialog id="note-dialog" class="modal"><form id="note-form" method="dialog"><h2 id="note-dialog-title">Add a review note</h2><label>Original text / anchor<textarea id="note-original" rows="3" placeholder="Optional: quote the exact passage to highlight"></textarea></label><label>Proposed replacement<textarea id="note-replacement" rows="3" placeholder="Leave blank for a note-only suggestion"></textarea></label><div class="two-col"><label>Category<select id="note-category"><option>punctuation</option><option>grammar</option><option>spelling</option><option>spacing</option><option>clarity</option><option>continuity</option><option>structure</option><option>other</option></select></label><label>Priority<select id="note-priority"><option value="clear">Mechanical</option><option value="possible">Consider</option><option value="later">Later</option></select></label></div><label>Reason / note<textarea id="note-explanation" rows="3" placeholder="What is worth checking?"></textarea></label><div class="button-row end"><button class="btn ghost" value="cancel">Cancel</button><button class="btn primary" value="save">Save note</button></div></form></dialog>
+
+<dialog id="review-dialog" class="modal wide"><div class="dialog-body"><h2>Import a Daily Pass review</h2><p class="muted fine">Paste the JSON reply from your Daily Pass ChatGPT chat, or load a .json file. Suggestions will be linked to the current chapter; none will be applied automatically.</p><textarea id="review-json" rows="12" spellcheck="false" placeholder='{"suggestions":[{"original":"old text","replacement":"new text","type":"punctuation","priority":"clear","note":"Explanation"}]}'></textarea><div id="review-import-result" class="fine status-message"></div><div class="button-row end"><button id="review-file-btn" class="btn outline">Choose .json</button><button id="review-cancel" class="btn ghost">Cancel</button><button id="review-confirm" class="btn primary">Import suggestions</button></div></div></dialog>
+
+<dialog id="cloud-dialog" class="modal"><div class="dialog-body"><h2>Cloud synchronisation</h2><p class="fine muted">Syncs chapters, changes and notes between your Mac and iPad using your own Supabase project. A private account and database setup are required.</p><label>Supabase project URL<input id="cloud-url" type="url" placeholder="https://your-project.supabase.co" autocomplete="off"></label><label>Publishable / anon key<input id="cloud-key" type="text" placeholder="sb_publishable_… or anon key" autocomplete="off"></label><div class="button-row"><button id="cloud-connect" class="btn outline">Save configuration</button></div><div class="divider"></div><div id="auth-logged-out"><label>Sign-in email<input id="cloud-email" type="email" placeholder="you@example.com" autocomplete="email"></label><button id="cloud-signin" class="btn primary">Email me a sign-in link</button></div><div id="auth-logged-in" hidden><p class="fine" id="cloud-user"></p><div class="button-row"><button id="cloud-sync-now" class="btn primary">Sync now</button><button id="cloud-signout" class="btn ghost">Sign out</button></div></div><p id="cloud-message" class="fine status-message"></p><div class="button-row end"><button id="cloud-close" class="btn ghost">Close</button></div></div></dialog>
+
+<dialog id="conflict-dialog" class="modal"><div class="dialog-body"><h2>Two versions found</h2><p>Your local changes and the cloud copy have diverged. Nothing has been overwritten. Download a full backup before choosing.</p><div class="button-row"><button id="conflict-backup" class="btn outline">Download local backup</button></div><div class="button-row wrap"><button id="conflict-cloud" class="btn outline">Use cloud version</button><button id="conflict-local" class="btn primary">Keep local & upload</button></div><p class="muted fine">Choosing one replaces the other version in the working app. Use the backup to preserve both if unsure.</p></div></dialog>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js" defer></script>
+</body></html>
