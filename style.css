@@ -11,3 +11,6 @@
 @media(max-width:1070px){.review-layout{grid-template-columns:minmax(0,1fr) minmax(310px,1fr)}.manuscript-view{padding:21px}}
 @media(max-width:950px){.workspace{grid-template-columns:1fr}.sidebar{min-height:auto;border-right:none;border-bottom:1px solid var(--border)}.chapter-list{flex-direction:row;overflow:auto;padding:0 12px 8px}.chapter-tab{width:auto;min-width:155px}.sidebar-foot{display:flex;gap:6px;flex-wrap:wrap;border-top:none;padding:3px 12px 11px}.sidebar-foot .btn{width:auto;flex:1}.main-panel{padding:16px 12px 24px}.review-layout{grid-template-columns:1fr}.manuscript-view{max-height:none;min-height:280px;padding:20px 18px 30px}.review-items{max-height:none;min-height:200px}.work-header{align-items:flex-start}.topbar{padding:12px}.desktop-only{display:none}}
 @media(max-width:450px){.brand strong{font-size:10px}.brand small{font-size:9px}.brand-mark{width:33px;height:33px;font-size:23px}.topbar{gap:5px}.top-actions{gap:3px}.top-actions .btn{font-size:11px;padding:7px}.top-actions .icon-btn{width:32px}.top-actions .pill{font-size:10px;max-width:87px}.work-header{flex-direction:column}.footer{flex-direction:column}.pane-header{flex-wrap:wrap}.modal .two-col{grid-template-columns:1fr}}
+
+/* v1.3: generous touch targets for reviewing on iPad */
+.review-buttons .btn{min-height:35px}.pane-tools .btn{min-height:33px}#otp-entry{margin-top:12px}

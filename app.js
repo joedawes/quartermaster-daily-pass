@@ -1,5 +1,5 @@
 'use strict';
-// Quartermaster Daily Pass v1.2. All manuscript edits are user-confirmed.
+// Quartermaster Daily Pass v1.3. All manuscript edits are user-confirmed.
 const STORE = 'quartermaster_daily_pass_v1';
 const CLOUD_STORE = 'quartermaster_daily_cloud_v1';
 const SYNC_STORE = 'quartermaster_daily_sync_v1';
@@ -93,23 +93,24 @@ function render(){
   $('undo-btn').disabled=!undoStack.length;
 }
 function renderReviews(c){
-  let notes=c.suggestions;const filter=$('review-filter').value;
+  let notes=[...c.suggestions].sort((a,b)=>{const pa=resolveAnchor(a,c).position,pb=resolveAnchor(b,c).position;return (pa<0?Infinity:pa)-(pb<0?Infinity:pb)||(a.createdAt||0)-(b.createdAt||0);});const filter=$('review-filter').value;
   if(filter==='pending')notes=notes.filter(s=>s.status==='pending');
-  if(filter==='later')notes=notes.filter(s=>s.priority==='later'&&s.status==='pending');
+  if(filter==='later')notes=notes.filter(s=>s.status==='deferred'||(s.priority==='later'&&s.status==='pending'));
   if(filter==='done')notes=notes.filter(s=>s.status!=='pending');
   $('review-items').innerHTML=notes.map(s=>{
     const anchor=resolveAnchor(s,c);
     const actionable=s.status==='pending';
+    const observation=!!s.original && s.replacement===s.original;
     const tag=s.status==='pending'?s.priority:s.status;
     const canRevert=s.status==='accepted' && s.original && s.replacement!==null && s.replacement!==undefined && resolveRevertAnchor(s,c)>=0;
     return `<article class="review-card ${selectedSuggestion===s.id?'selected':''}" data-card="${h(s.id)}" data-status="${h(s.status)}">
      <div class="review-top"><span class="tagline"><span class="tag ${h(tag)}">${h(tag==='clear'?'Mechanical':tag==='possible'?'Consider':tag==='later'?'Later':tag)}</span><span class="category">${h(s.type||'note')}</span></span><button class="btn tiny ghost" data-action="locate" data-id="${h(s.id)}" aria-label="Locate suggestion in manuscript">↗ Find</button></div>
      ${s.original?`<div class="snippet-label">Current / original</div><div class="edit-snippet before">${h(s.original)}</div>`:''}
-     ${s.replacement!==null && s.replacement!==undefined && s.original?`<div class="snippet-label">Suggested</div><div class="edit-snippet after">${h(s.replacement)||'<em>(delete text)</em>'}</div>`:''}
+     ${s.replacement!==null && s.replacement!==undefined && s.original && !observation?`<div class="snippet-label">Suggested</div><div class="edit-snippet after">${h(s.replacement)||'<em>(delete text)</em>'}</div>`:''}
      ${s.note?`<p class="review-note">${h(s.note)}</p>`:''}
      ${actionable && s.original && anchor.position<0?`<div class="anchor-warning">${h(anchor.reason)}. No automatic replacement.</div>`:''}
      <div class="review-buttons">${actionable?
-       `${s.original && s.replacement!==null && s.replacement!==undefined?`<button class="btn tiny primary" data-action="accept" data-id="${h(s.id)}" ${anchor.position<0?'disabled':''}>Accept</button>`:`<button class="btn tiny primary" data-action="reviewed" data-id="${h(s.id)}">Mark reviewed</button>`}
+       `${s.original && s.replacement!==null && s.replacement!==undefined && !observation?`<button class="btn tiny primary" data-action="accept" data-id="${h(s.id)}" ${anchor.position<0?'disabled':''}>Accept</button>`:`<button class="btn tiny primary" data-action="reviewed" data-id="${h(s.id)}">Mark reviewed</button>`}
          <button class="btn tiny outline" data-action="edit" data-id="${h(s.id)}">Edit</button>
          <button class="btn tiny ghost" data-action="skip" data-id="${h(s.id)}">Skip</button>
          ${s.priority==='later'?'':`<button class="btn tiny ghost" data-action="later" data-id="${h(s.id)}">Later</button>`}`:
@@ -118,6 +119,12 @@ function renderReviews(c){
   }).join('') || `<div class="no-notes">${filter==='pending'?'No pending suggestions. Import a review or add your own notes.':'Nothing to show in this filter.'}</div>`;
 }
 function selectSuggestion(sid){selectedSuggestion=sid;render();const card=document.querySelector(`[data-card="${CSS.escape(sid)}"]`);if(card)card.scrollIntoView({block:'nearest',behavior:'smooth'});const mark=document.querySelector(`mark[data-sid="${CSS.escape(sid)}"]`);if(mark)mark.scrollIntoView({block:'center',behavior:'smooth'});}
+function advanceReview(previousId){
+  const c=current();if(!c)return;
+  const ordered=[...c.suggestions].sort((a,b)=>{const pa=resolveAnchor(a,c).position,pb=resolveAnchor(b,c).position;return (pa<0?Infinity:pa)-(pb<0?Infinity:pb)||(a.createdAt||0)-(b.createdAt||0);});
+  const next=ordered.find(s=>s.status==='pending'&&s.id!==previousId);
+  selectedSuggestion=null;if(next)selectSuggestion(next.id);else render();
+}
 function actOnSuggestion(sid,action){
   const c=current(),s=c?.suggestions.find(t=>t.id===sid);if(!s)return;
   if(action==='locate'){selectSuggestion(sid);return;}
@@ -136,6 +143,7 @@ function actOnSuggestion(sid,action){
     return;
   }
   if(action==='accept'){
+    if(s.replacement===s.original){alert('This is an observation, not a correction. Use Edit, Skip or Later.');return;}
     const anchor=resolveAnchor(s,c);if(anchor.position<0||s.replacement===null||s.replacement===undefined){alert('This passage cannot be matched safely. Edit the anchor or change the chapter manually.');return;}
     mutate(ch=>{
       const t=ch.suggestions.find(t=>t.id===sid),pos=resolveAnchor(t,ch).position;
@@ -145,16 +153,18 @@ function actOnSuggestion(sid,action){
       const delta=t.replacement.length-t.original.length;
       for(const other of ch.suggestions){if(other.id!==sid && other.status==='pending' && Number.isInteger(other.position) && other.position>=pos+t.original.length)other.position+=delta;}
     });
+    advanceReview(sid);
     return;
   }
-  if(action==='reviewed'||action==='skip'||action==='later'||action==='reopen')mutate(ch=>{const t=ch.suggestions.find(t=>t.id===sid);if(action==='reviewed')t.status='accepted';if(action==='skip')t.status='skipped';if(action==='later')t.priority='later';if(action==='reopen')t.status='pending';});
+  if(action==='reviewed'||action==='skip'||action==='later'||action==='reopen')mutate(ch=>{const t=ch.suggestions.find(t=>t.id===sid);if(action==='reviewed')t.status='accepted';if(action==='skip')t.status='skipped';if(action==='later'){t.priority='later';t.status='deferred';}if(action==='reopen')t.status='pending';});
+  if(['skip','later','reviewed'].includes(action))advanceReview(sid);
 }
 function openNote(s=null,fromSelection=''){
   if(!current())return;
   editingSuggestion=s?.id||null;
   $('note-dialog-title').textContent=s?'Edit suggestion':'Add a review note';
   $('note-original').value=s?.original??fromSelection??'';
-  $('note-replacement').value=s?.replacement??'';
+  $('note-replacement').value=s?.replacement??s?.original??fromSelection??'';
   $('note-explanation').value=s?.note??'';
   $('note-category').value=Array.from($('note-category').options).some(o=>o.value===s?.type)?s.type:'other';
   $('note-priority').value=s?.priority||'possible';
@@ -234,7 +244,7 @@ STRICT OUTPUT: Return exactly ONE valid JSON object, with no Markdown, code fenc
 
 MATCHING AND SAFETY:
 - Each suggested replacement MUST quote its "original" passage *exactly* as it appears in the manuscript. Preserve whitespace, curly quotes, spelling and case in that original anchor. Prefer the shortest UNIQUE identifying span; enlarge it if repeated. Never invent or paraphrase an anchor.
-- For a non-replacement observation, set "replacement":null. Include an exact "original" anchor when the observation concerns a specific passage. Use "original":"" only for chapter-wide observations with no single meaningful anchor.
+- For a passage-specific observation without a definite correction, set "replacement" equal to the EXACT "original" passage. For chapter-wide observations without a passage, set "replacement":null. Use "original":"" only for chapter-wide observations with no single meaningful anchor.
 - Change only the quoted passage, never adjacent text. Do not combine multiple unrelated edits in one replacement.
 - Do not assume that this review is being applied to the newest Scrivener version: suggestions must match the exact provided manuscript. The author will decide what to accept.
 - Escape quotation marks, backslashes and line breaks correctly for JSON. Match "chapter_title" exactly.
@@ -343,7 +353,20 @@ $('backup-btn').onclick=downloadBackup;
 $('restore-btn').onclick=()=>$('backup-file').click();
 $('backup-file').onchange=async e=>{try{const data=JSON.parse(await e.target.files[0].text());const incoming=data.state||data;if(!Array.isArray(incoming.chapters))throw Error('Not a valid Daily Pass backup');if(!confirm('Restore this backup? This replaces all chapters in the app. Download your current backup first.'))return;remember();state=incoming;state.version=1;touch();}catch(err){alert('Restore failed: '+err.message);}e.target.value='';};
 $('theme-btn').onclick=()=>{state.theme=state.theme==='dark'?'light':'dark';writeLocal(true);render();};
-$('edit-text').onclick=()=>{if(showingOriginal)return;$('manuscript-view').hidden=true;$('text-editor').hidden=false;$('working-text').value=current().text;$('edit-text').disabled=true;};
+function manuscriptOffsetFromSelection(){
+  const view=$('manuscript-view'),selection=window.getSelection();
+  if(!selection||!selection.rangeCount||!view.contains(selection.anchorNode))return null;
+  const r=selection.getRangeAt(0).cloneRange();r.selectNodeContents(view);r.setEnd(selection.anchorNode,selection.anchorOffset);
+  return r.toString().length;
+}
+let lastManuscriptOffset=null;
+$('manuscript-view').addEventListener('pointerup',()=>{const offset=manuscriptOffsetFromSelection();if(offset!==null)lastManuscriptOffset=offset;});
+$('edit-text').onclick=()=>{if(showingOriginal)return;
+  const view=$('manuscript-view'),offset=lastManuscriptOffset;
+  view.hidden=true;$('text-editor').hidden=false;$('working-text').value=current().text;$('edit-text').disabled=true;
+  const textarea=$('working-text');textarea.focus();const at=Math.max(0,Math.min(offset??0,textarea.value.length));textarea.setSelectionRange(at,at);
+  const lines=textarea.value.slice(0,at).split('\n').length;textarea.scrollTop=Math.max(0,(lines-4)*27);
+};
 function closeEditor(){$('text-editor').hidden=true;$('manuscript-view').hidden=false;$('edit-text').disabled=false;}
 $('cancel-text').onclick=closeEditor;
 $('save-text').onclick=()=>{const next=cleanText($('working-text').value);if(next!==current().text)mutate(c=>{c.text=next;for(const s of c.suggestions)if(s.status==='pending')s.position=-1;});closeEditor();};
@@ -359,11 +382,13 @@ $('review-cancel').onclick=()=>$('review-dialog').close();
 $('review-file-btn').onclick=()=>$('review-file').click();
 $('review-file').onchange=async e=>{const file=e.target.files[0];if(file)$('review-json').value=await file.text();e.target.value='';};
 $('review-confirm').onclick=()=>{try{const r=importReview($('review-json').value);$('review-dialog').close();if(r.unmatched)alert(`${r.items.length} suggestions imported. ${r.unmatched} passage(s) are missing or ambiguous; these require manual attention.`);}catch(e){$('review-import-result').textContent=e.message;}};
+$('copy-chapter').onclick=async()=>{try{await navigator.clipboard.writeText(current().text);notify('Full working chapter copied');}catch(e){alert('Could not copy text: '+e.message);}};
 $('copy-prompt').onclick=async()=>{try{await navigator.clipboard.writeText(reviewPrompt(current()));notify('Review instructions and chapter copied to clipboard');}catch(e){alert('Clipboard unavailable. Open this app on HTTPS (GitHub Pages) to use this feature.');}};
 $('cloud-btn').onclick=()=>{ $('cloud-url').value=cloudCfg.url||'';$('cloud-key').value=cloudCfg.key||'';$('cloud-dialog').showModal();};
 $('cloud-close').onclick=()=>$('cloud-dialog').close();
 $('cloud-connect').onclick=async()=>{const url=$('cloud-url').value.trim(),key=$('cloud-key').value.trim();if(!/^https:\/\/[a-z0-9.-]+\.supabase\.co\/?$/i.test(url)||!key){setCloudMessage('Enter a valid Supabase project URL and a publishable/anon key.');return;}cloudCfg={url:url.replace(/\/$/,''),key};localStorage.setItem(CLOUD_STORE,JSON.stringify(cloudCfg));sb=null;user=null;cloudUserId=null;cloudRev=null;dirty=state.chapters.length>0;persistSyncMeta();setCloudMessage('Configuration saved. Connect and sign in.');await initSupabase();};
-$('cloud-signin').onclick=async()=>{const email=$('cloud-email').value.trim();if(!sb){setCloudMessage('Save a valid Supabase configuration first.');return;}if(!email){setCloudMessage('Enter your email address.');return;}try{const redirectTo=location.origin+location.pathname;const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:redirectTo}});if(error)throw error;setCloudMessage('Check your inbox for the sign-in link. Open it on this device.');}catch(e){setCloudMessage('Sign-in failed: '+e.message);}};
+$('cloud-signin').onclick=async()=>{const email=$('cloud-email').value.trim();if(!sb){setCloudMessage('Save a valid Supabase configuration first.');return;}if(!email){setCloudMessage('Enter your email address.');return;}try{const redirectTo=location.origin+location.pathname;const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:redirectTo}});if(error)throw error;$('otp-entry').hidden=false;setCloudMessage('Check your email for the six-digit code and enter it here.');}catch(e){setCloudMessage('Sign-in failed: '+e.message);}};
+$('cloud-verify').onclick=async()=>{const email=$('cloud-email').value.trim(),token=$('cloud-otp').value.trim();if(!sb||!email||!/^[0-9]{6}$/.test(token)){setCloudMessage('Enter your email and six-digit code.');return;}try{const {error}=await sb.auth.verifyOtp({email,token,type:'email'});if(error)throw error;$('otp-entry').hidden=true;setCloudMessage('Signed in successfully.');}catch(e){setCloudMessage('Code verification failed: '+e.message);}};
 $('cloud-signout').onclick=async()=>{if(sb)await sb.auth.signOut();user=null;paintSync();};
 $('cloud-sync-now').onclick=async()=>{if(dirty)await syncToCloud();else await pullFromCloud();};
 $('conflict-backup').onclick=downloadBackup;
