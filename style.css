@@ -14,3 +14,6 @@
 
 /* v1.3: generous touch targets for reviewing on iPad */
 .review-buttons .btn{min-height:35px}.pane-tools .btn{min-height:33px}#otp-entry{margin-top:12px}
+
+/* v1.4 landing page and version marker */
+.home-screen{max-width:960px;margin:clamp(20px,7vh,90px) auto;padding:10px 8px}.home-intro h1{font:clamp(30px,4vw,44px) Georgia,serif;margin:9px 0}.home-intro p{font-size:15px;max-width:580px}.home-actions{display:flex;flex-wrap:wrap;gap:10px;margin:25px 0 36px}.home-section-title{font:21px Georgia,serif;margin:0 0 15px}.home-chapters{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.home-chapter{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:7px;background:var(--card);border:1px solid var(--border);border-radius:11px;color:var(--text);padding:19px;min-height:100px}.home-chapter:hover{border-color:var(--accent)}.home-chapter span{font-size:12px;color:var(--muted)}.version-watermark{opacity:.7;white-space:nowrap;font-size:10px;letter-spacing:.06em}

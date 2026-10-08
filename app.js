@@ -1,5 +1,5 @@
 'use strict';
-// Quartermaster Daily Pass v1.3. All manuscript edits are user-confirmed.
+// Quartermaster Daily Pass v1.4. All manuscript edits are user-confirmed.
 const STORE = 'quartermaster_daily_pass_v1';
 const CLOUD_STORE = 'quartermaster_daily_cloud_v1';
 const SYNC_STORE = 'quartermaster_daily_sync_v1';
@@ -17,6 +17,7 @@ const notify = msg => { $('save-status').textContent = msg; };
 let state;
 try { state=JSON.parse(localStorage.getItem(STORE))||blank(); if(!state||!Array.isArray(state.chapters))state=blank(); }catch(_){state=blank();}
 state.theme = state.theme==='light'?'light':'dark';
+let homeVisible=true;
 let undoStack=[], selectedSuggestion=null, editingSuggestion=null, noteSelectedText='', syncTimer=null, showingOriginal=false;
 let syncMeta; try{syncMeta=JSON.parse(localStorage.getItem(SYNC_STORE))||{};}catch(_){syncMeta={};}
 let dirty=!!syncMeta.dirty, cloudRev=syncMeta.revision??null, cloudUserId=syncMeta.userId||null;
@@ -37,9 +38,9 @@ function persistSyncMeta(){localStorage.setItem(SYNC_STORE,JSON.stringify({dirty
 function touch(){writeLocal(true);render();}
 function current(){return state.chapters.find(c=>c.id===state.activeId)||null;}
 function ensureChapter(c){c.suggestions??=[];c.originalText??=c.text||'';c.text??='';}
-function addChapter(title,text){remember();const c={id:id(),title:title.trim()||`Chapter ${state.chapters.length+1}`,originalText:cleanText(text),text:cleanText(text),suggestions:[],createdAt:Date.now(),updatedAt:Date.now()};state.chapters.push(c);state.activeId=c.id;touch();}
+function addChapter(title,text){homeVisible=false;remember();const c={id:id(),title:title.trim()||`Chapter ${state.chapters.length+1}`,originalText:cleanText(text),text:cleanText(text),suggestions:[],createdAt:Date.now(),updatedAt:Date.now()};state.chapters.push(c);state.activeId=c.id;touch();}
 function mutate(fn){const c=current();if(!c)return;remember();fn(c);c.updatedAt=Date.now();touch();}
-function switchChapter(chId){closeEditor();showingOriginal=false;state.activeId=chId;selectedSuggestion=null;writeLocal(false);render();}
+function switchChapter(chId){homeVisible=false;closeEditor();showingOriginal=false;state.activeId=chId;selectedSuggestion=null;writeLocal(false);render();}
 
 function resolveAnchor(s,c){
   const needle=s.original||'';
@@ -75,7 +76,8 @@ function renderChapters(){
 function render(){
   document.documentElement.dataset.theme=state.theme;
   renderChapters();
-  const c=current();$('empty-state').hidden=!!c;$('chapter-workspace').hidden=!c;
+  const c=current();$('home-screen').hidden=!homeVisible;$('empty-state').hidden=homeVisible||!!c;$('chapter-workspace').hidden=homeVisible||!c;
+  $('home-chapters').innerHTML=state.chapters.length?[...state.chapters].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).map(ch=>`<button class="home-chapter" data-home-chapter="${h(ch.id)}"><strong>${h(ch.title)}</strong><span>${countWords(ch.text)} words · ${(ch.suggestions||[]).filter(x=>x.status!=='pending').length}/${(ch.suggestions||[]).length} reviewed</span></button>`).join(''):'<p class="muted">No chapters yet. Import one to begin.</p>';
   if(!c)return;
   ensureChapter(c);
   $('chapter-title').textContent=c.title;
@@ -344,6 +346,10 @@ $('new-chapter').onclick=$('empty-new').onclick=()=>{const dialog=$('chapter-dia
 $('chapter-form').addEventListener('submit',e=>{e.preventDefault();if(e.submitter?.value==='cancel'){$('chapter-dialog').close();return;}addChapter($('chapter-name').value,$('chapter-initial-text').value);$('chapter-dialog').close();});
 $('import-chapter').onclick=$('empty-import').onclick=()=>$('chapter-file').click();
 $('chapter-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const text=cleanText(await file.text());addChapter(file.name.replace(/\.(txt|md)$/i,''),text);}catch(err){alert('Import failed: '+err.message);}e.target.value='';};
+$('home-btn').onclick=()=>{closeEditor();homeVisible=true;render();};
+$('home-chapters').addEventListener('click',e=>{const btn=e.target.closest('[data-home-chapter]');if(btn)switchChapter(btn.dataset.homeChapter);});
+$('home-import').onclick=()=> $('import-chapter').click();
+$('home-new').onclick=()=> $('new-chapter').click();
 $('chapter-list').addEventListener('click',e=>{const tab=e.target.closest('[data-chapter]');if(tab)switchChapter(tab.dataset.chapter);});
 $('rename-btn').onclick=()=>{const c=current();if(!c)return;const value=prompt('Rename chapter',c.title);if(value&&value.trim())mutate(ch=>ch.title=value.trim());};
 $('delete-chapter').onclick=()=>{const c=current();if(!c||!confirm(`Delete ${c.title}? This removes its working and original copies from the app. Download a backup first if you want to keep them.`))return;remember();state.chapters=state.chapters.filter(ch=>ch.id!==c.id);state.activeId=state.chapters[0]?.id||null;showingOriginal=false;touch();};
