@@ -31,7 +31,11 @@
     </aside>
 
     <main class="main-panel">
-      <div id="home-screen" class="home-screen" hidden><div class="home-intro"><span class="eyebrow">THE QUARTERMASTER · DAILY PASS</span><h1>Welcome back</h1><p class="muted">Pick up a chapter or bring in something new. Keep the pass light, then move on.</p></div><div class="home-actions"><button id="home-import" class="btn primary" type="button">Import chapter</button><button id="home-new" class="btn outline" type="button">New chapter</button></div><h2 class="home-section-title">Your chapters</h2><div id="home-chapters" class="home-chapters"></div></div><div id="empty-state" class="empty-state">
+      <div id="home-screen" class="home-screen" hidden>
+        <div class="home-intro"><span class="eyebrow">THE QUARTERMASTER · DAILY PASS</span><h1>Daily Pass</h1><p class="muted">A quiet place for a quick manuscript review.</p></div>
+        <div class="home-actions"><button id="home-open" class="btn primary" type="button">Open editor</button><button id="home-import" class="btn outline" type="button">Import chapter</button><button id="home-new" class="btn ghost" type="button">New chapter</button></div>
+      </div>
+      <div id="empty-state" class="empty-state">
         <div class="large-mark">Q</div>
         <h1>Your daily clean pass</h1>
         <p>Import a chapter from Scrivener. Read the manuscript beside a queue of suggested changes and notes. Accept, edit, skip or save for later. Nothing is applied automatically.</p>
@@ -67,7 +71,7 @@
       </div>
     </main>
   </div>
-  <footer class="footer"><span>READ → FIX OBVIOUS → FLAG DOUBT → MOVE ON</span><span id="save-status">Ready · locally saved</span><span class="version-watermark">Daily Pass v1.4</span></footer>
+  <footer class="footer"><span>READ → FIX OBVIOUS → FLAG DOUBT → MOVE ON</span><span id="save-status">Ready · locally saved</span><span class="version-watermark">Daily Pass v1.5</span></footer>
 </div>
 
 <input type="file" id="chapter-file" accept=".txt,.md,text/plain,text/markdown" hidden>

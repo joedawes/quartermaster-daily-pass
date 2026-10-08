@@ -1,5 +1,5 @@
 'use strict';
-// Quartermaster Daily Pass v1.4. All manuscript edits are user-confirmed.
+// Quartermaster Daily Pass v1.5. All manuscript edits are user-confirmed.
 const STORE = 'quartermaster_daily_pass_v1';
 const CLOUD_STORE = 'quartermaster_daily_cloud_v1';
 const SYNC_STORE = 'quartermaster_daily_sync_v1';
@@ -77,7 +77,6 @@ function render(){
   document.documentElement.dataset.theme=state.theme;
   renderChapters();
   const c=current();$('home-screen').hidden=!homeVisible;$('empty-state').hidden=homeVisible||!!c;$('chapter-workspace').hidden=homeVisible||!c;
-  $('home-chapters').innerHTML=state.chapters.length?[...state.chapters].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).map(ch=>`<button class="home-chapter" data-home-chapter="${h(ch.id)}"><strong>${h(ch.title)}</strong><span>${countWords(ch.text)} words · ${(ch.suggestions||[]).filter(x=>x.status!=='pending').length}/${(ch.suggestions||[]).length} reviewed</span></button>`).join(''):'<p class="muted">No chapters yet. Import one to begin.</p>';
   if(!c)return;
   ensureChapter(c);
   $('chapter-title').textContent=c.title;
@@ -347,7 +346,7 @@ $('chapter-form').addEventListener('submit',e=>{e.preventDefault();if(e.submitte
 $('import-chapter').onclick=$('empty-import').onclick=()=>$('chapter-file').click();
 $('chapter-file').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const text=cleanText(await file.text());addChapter(file.name.replace(/\.(txt|md)$/i,''),text);}catch(err){alert('Import failed: '+err.message);}e.target.value='';};
 $('home-btn').onclick=()=>{closeEditor();homeVisible=true;render();};
-$('home-chapters').addEventListener('click',e=>{const btn=e.target.closest('[data-home-chapter]');if(btn)switchChapter(btn.dataset.homeChapter);});
+$('home-open').onclick=()=>{homeVisible=false;render();};
 $('home-import').onclick=()=> $('import-chapter').click();
 $('home-new').onclick=()=> $('new-chapter').click();
 $('chapter-list').addEventListener('click',e=>{const tab=e.target.closest('[data-chapter]');if(tab)switchChapter(tab.dataset.chapter);});
